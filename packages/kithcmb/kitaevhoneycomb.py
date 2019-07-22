@@ -1,0 +1,326 @@
+# 09/05/19
+# Chris Self
+import numpy as np
+from scipy import linalg as spla
+from matplotlib import pyplot as plt
+
+def make_A(J,K,Ux,Uy,Uz,resolved_idx_to_one_d):
+    """
+    """
+    A = np.zeros((2*Ux.size,2*Ux.size))
+
+    # nn-links
+    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,:,1]] = J[0]*Ux
+    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0],resolved_idx_to_one_d[:,:,1]] = J[1]*Uy
+    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0],resolved_idx_to_one_d[:,:,1]] = J[2]*Uz
+
+    # nnn-links
+    # bb
+    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0],resolved_idx_to_one_d[:,:,0]] = K*Ux*Uz
+    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0]] = K*Ux*Uy
+    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0],\
+      resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0]] = K*Uy*Uz
+    # ww
+    A[resolved_idx_to_one_d[:,:,1],resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,1]] = K*Ux[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]*Uz
+    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],1],resolved_idx_to_one_d[:,:,1]] = K*Ux[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]*Uy
+    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,1],\
+      resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],1]] = K*Uy[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]*Uz[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]
+
+    # symmetrise
+    A = A - np.transpose(A)
+    
+    return 2.*A
+
+class kitaevhoneycomb(object):
+
+    def __init__(self,*args,**kwargs):
+        """
+        """
+
+        # unpack kwargs
+        self.J = tuple(kwargs['J'])
+        assert len(self.J)==3
+        self.K = kwargs['K']
+
+        Ux,Uy,Uz = np.array(kwargs['Ux']),np.array(kwargs['Uy']),np.array(kwargs['Uz'])
+        assert Ux.shape==Uy.shape
+        assert Ux.shape==Uz.shape
+
+        # tensors that convert between different indexing of the sites
+        self.resolved_index_to_one_d = np.zeros((Ux.shape[0],Ux.shape[1],2),dtype=np.int32)
+        self.resolved_index_to_one_d[:,:,0] = np.arange(Ux.size).reshape((Ux.shape[0],Ux.shape[1])) # b sites
+        self.resolved_index_to_one_d[:,:,1] = Ux.size + np.arange(Ux.size).reshape((Ux.shape[0],Ux.shape[1])) # w sites
+        self.one_d_index_to_resolved = np.zeros((2*Ux.size,3),dtype=np.int32)
+        self.one_d_index_to_resolved[:,0] = (np.arange(2*Ux.size)%Ux.size)//Ux.shape[1] # row index
+        self.one_d_index_to_resolved[:,1] = (np.arange(2*Ux.size)%Ux.size)%Ux.shape[1] # col index
+        self.one_d_index_to_resolved[:,2] = np.arange(2*Ux.size)//Ux.size # bw value
+
+        # tensor to give the real-space position of sites
+        a1 = np.array([np.sqrt(3),0.])
+        a2 = np.array([np.sqrt(3)/2,-3./2])
+        bw_vector = np.array([np.sqrt(3)/2,-1./2])
+        self.real_space_positions = np.zeros((2*Ux.size,2))
+        self.real_space_positions[:,0] = self.one_d_index_to_resolved[:,0]*a2[0] +\
+                                    self.one_d_index_to_resolved[:,1]*a1[0] +\
+                                    self.one_d_index_to_resolved[:,2]*bw_vector[0]
+        self.real_space_positions[:,1] = self.one_d_index_to_resolved[:,0]*a2[1] +\
+                                    self.one_d_index_to_resolved[:,1]*a1[1] +\
+                                    self.one_d_index_to_resolved[:,2]*bw_vector[1]
+
+        # compute A matrix
+        self.A = make_A(self.J,self.K,Ux,Uy,Uz,self.resolved_index_to_one_d)
+
+        # identify vortices
+        self.vortices = Uz[:,:]*Uy[:,:]*Ux[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]\
+                        *Uz[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]\
+                        *Ux[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]\
+                        *Uy[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]
+
+    def draw_resolved_labelling(self,display_fig=True,filename=None,**savefigkwargs):
+        """
+        draw the lattice with the resolved labelling annotated
+        """
+        fscale = self.vortices.shape[0]/10.
+        fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
+        ax.set_aspect('equal')
+        plt.axis('off')
+
+        bw_vector = np.array([np.sqrt(3)/2,-1./2])
+        for row,col,bw in self.one_d_index_to_resolved[self.one_d_index_to_resolved[:,2]==1]:
+            pos = self.real_space_positions[self.resolved_index_to_one_d[row,col,bw]]-bw_vector/2.
+            ax.annotate("("+"{0:.3g}".format(row)+","+"{0:.3g}".format(col)+")",xy=tuple(pos))
+            ax.plot([(pos-bw_vector/2.)[0],(pos+bw_vector/2.)[0]],[(pos-bw_vector/2.)[1],(pos+bw_vector/2.)[1]],'k')
+
+        for bw in [0,1]:
+            sites = (self.one_d_index_to_resolved[:,2]==bw)
+            ax.scatter(self.real_space_positions[sites,0],self.real_space_positions[sites,1],c='C'+str(bw),s=100)
+            
+        if not filename is None:
+            plt.savefig(filename,**savefigkwargs)
+
+        if display_fig:
+            plt.show()
+        else:
+            plt.close()
+
+    def draw_one_d_labelling(self,display_fig=True,filename=None,**savefigkwargs):
+        """
+        draw the lattice with the one-d site labelling annotated
+        """
+        fscale = self.vortices.shape[0]/10.
+        fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
+        ax.set_aspect('equal')
+        plt.axis('off')
+
+        for bw in [0,1]:
+            sites = (self.one_d_index_to_resolved[:,2]==bw)
+            ax.scatter(self.real_space_positions[sites,0],self.real_space_positions[sites,1],c='C'+str(bw),s=100)
+            
+        for site in np.arange(2*self.vortices.size):
+            pos = self.real_space_positions[site]
+            ax.annotate(str(site),xy=pos)
+            
+        if not filename is None:
+            plt.savefig(filename,**savefigkwargs)
+
+        if display_fig:
+            plt.show()
+        else:
+            plt.close()
+
+    def draw_system(self,draw_sites=True,display_fig=True,defer_display=False,filename=None,**savefigkwargs):
+        """
+        draw the complete system with all sites, vortices and all A-links indicated.
+        (this will be slow for large systems.)
+
+        the A-link couplings have their direction drawn and are coloured based on whether
+        they are flipped relative to the 'regular' definition of the no-vortex sector.
+
+        this function is slow because of the loop over all lower-triangular elements of A,
+        I have written it this way so that this function can be used as a visual tests of
+        whether the A matrix is being computed correctly or not. however, a quicker version
+        could be written that only visits the A-links we expect to have non-zero values.
+        """
+        fscale = self.vortices.shape[0]/10.
+        fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
+        ax.set_aspect('equal')
+        plt.axis('off')
+
+        # draw sites
+        if draw_sites:
+            for bw in [0,1]:
+                sites = (self.one_d_index_to_resolved[:,2]==bw)
+                ax.scatter(self.real_space_positions[sites,0],self.real_space_positions[sites,1],c='C'+str(bw),s=50)
+            
+        # add couplings
+        a1 = np.array([np.sqrt(3),0.])
+        a2 = np.array([np.sqrt(3)/2,-3./2])
+        bw_vector = np.array([np.sqrt(3)/2,-1./2])
+        regular_A = make_A(self.J,self.K,np.ones(self.vortices.shape),np.ones(self.vortices.shape),np.ones(self.vortices.shape),self.resolved_index_to_one_d)
+        for site in range(2*self.vortices.size):
+            for siteprime in range(site):
+                if not np.isclose(np.abs(self.A[site,siteprime]),0.):
+                    pos = self.real_space_positions[site]
+                    posprime = self.real_space_positions[siteprime]
+
+                    # if the links are flipped relative to no-vortex sector colour them red
+                    colour = 'k'
+                    if not np.isclose(self.A[site,siteprime],regular_A[site,siteprime]):
+                        colour = 'r'
+                        
+                    # handle boundary links
+                    # ---
+                    # also draws invisible point at edge to ensure arrows hanging off the sides
+                    # are not culled
+                    invisible_point_size = 20
+                    if np.abs(self.one_d_index_to_resolved[site][0]-self.one_d_index_to_resolved[siteprime][0])==(self.vortices.shape[0]-1) and\
+                       np.abs(self.one_d_index_to_resolved[site][1]-self.one_d_index_to_resolved[siteprime][1])==(self.vortices.shape[1]-1):
+                        # corner wrap around draw correction
+                        #colour = 'b'
+                        if self.one_d_index_to_resolved[site][1]>self.one_d_index_to_resolved[siteprime][1]:
+                            pos = pos+self.vortices.shape[0]*a2
+                            pos = pos-self.vortices.shape[1]*a1
+                            ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
+                        else:
+                            posprime = posprime+self.vortices.shape[0]*a2
+                            posprime = posprime-self.vortices.shape[1]*a1
+                            ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
+                            
+                    else:
+                        # left-right (col) wrap around draw correction
+                        if np.abs(self.one_d_index_to_resolved[site][1]-self.one_d_index_to_resolved[siteprime][1])==(self.vortices.shape[1]-1):
+                            #colour = 'r'
+                            if self.one_d_index_to_resolved[site][1]>self.one_d_index_to_resolved[siteprime][1]:
+                                posprime = posprime+self.vortices.shape[1]*a1
+                                ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
+                            else:
+                                pos = pos+self.vortices.shape[1]*a1
+                                ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
+                        # up-down (row) wrap around draw correction
+                        if np.abs(self.one_d_index_to_resolved[site][0]-self.one_d_index_to_resolved[siteprime][0])==(self.vortices.shape[0]-1):
+                            #colour = 'g'
+                            if self.one_d_index_to_resolved[site][0]>self.one_d_index_to_resolved[siteprime][0]:
+                                posprime = posprime+self.vortices.shape[0]*a2
+                                ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
+                            else:
+                                pos = pos+self.vortices.shape[0]*a2
+                                ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
+                                
+                    # draw A-links as arrows
+                    if self.A[site,siteprime]>0:
+                        ax.annotate("",xytext=tuple(pos),xy=tuple(posprime),\
+                                    arrowprops={'arrowstyle':'->',\
+                                                'alpha':np.abs(self.A[site,siteprime])/np.max(self.A),\
+                                                'color':colour})
+                    else:
+                        ax.annotate("",xytext=tuple(posprime),xy=tuple(pos),\
+                                    arrowprops={'arrowstyle':'->',\
+                                                'alpha':np.abs(self.A[site,siteprime])/np.max(self.A),\
+                                                'color':colour})
+                        
+        # draw vortices
+        ax.scatter(self.real_space_positions[self.resolved_index_to_one_d[self.vortices==-1,1]][:,0]+bw_vector[0],\
+                   self.real_space_positions[self.resolved_index_to_one_d[self.vortices==-1,1]][:,1]+bw_vector[1],\
+                   c='k',s=100)
+              
+        if not filename is None:
+            plt.savefig(filename,**savefigkwargs)
+
+        if defer_display:
+            return fig,ax
+        else:
+            if display_fig:
+                plt.show()
+            else:
+                plt.close()
+
+    def get_spectrum(self):
+        """ """
+        return spla.eigvalsh(1j*self.A)
+
+    def get_normal_form(self):
+        """
+        """
+
+        # add small random noise to lift degeneracies enough to be able
+        # to properly order the columns of Q
+        epsilon = 1E-8
+        R = 2.*(np.random.rand(*self.A.shape) - 0.5)
+        R = epsilon*(R + np.transpose(R))
+
+        # get the block-diagonal fully-real Schur normal form
+        diagonalised_A = self.A
+        diagonalised_A = diagonalised_A + np.sign(diagonalised_A)*R
+        Sigma,Q=spla.schur(diagonalised_A, output='real', lwork=None, overwrite_a=True, sort=None, check_finite=True)
+
+        # Sigma and Q returned above are not in the form we want them: which is:
+        #
+        # \Sigma = [[   0,   \l_1,    0,     0,   . . . ]
+        #           [ -\l_1,   0,     0,     0,   . . . ]
+        #           [   0,     0,     0,   \l_2,  . . . ]
+        #           [   0,     0,   -\l_2,   0,   . . . ]
+        #           [   .      .      .      .    .     ]
+        #           [   .      .      .      .      .   ]
+        #           [   .      .      .      .        . ]]
+        #
+        # where \l_1 > \l_2 > ... > 0 and the related ordering of Q.
+        # instead, the matrices returned sometimes have the signs the other way around, and
+        # the signs are not consistent between blocks. additionally, zero modes are not paired
+        # into a block and appear as randomly placed single columns. 
+        # the following fixes both of these problems first by finding the permutation that puts
+        # all of the values contained in Sigma in decreasing order [ -\l_1, -\l_2, ... , \l_2, \l_1 ], 
+        # then by 'folding' this permutation back on itself about the middle so that the column of Q
+        # associated with -\l_1 becomes the first column, with \l_1 becomes the second column, ...
+        # 
+        # flatten evals of A
+        evals = np.sum(Sigma,axis=0)
+        # get the -ve to +ve ordering
+        permutation = np.argsort(evals)
+        # fold permutation back onto itself to get correct 
+        # ordering for columns of Q matrix
+        q_permutation = np.zeros(self.A.shape[0],dtype='i')
+        q_permutation[::2] = permutation[:self.A.shape[0]//2]
+        q_permutation[1::2] = permutation[-1:-self.A.shape[0]//2-1:-1]
+        Q = Q[:,q_permutation]
+        Sigma = Sigma[:,:]
+        Sigma = Sigma[:,q_permutation]
+        Sigma = Sigma[q_permutation,:]
+
+        # tests
+        assert np.isclose(np.abs(spla.det(Q)),1.) # |detQ|=1
+        assert np.all(np.isclose(np.dot(Q,np.transpose(Q)),np.diag(np.ones(Q.shape[0])))) # Q orthogonal
+        assert np.all(np.isclose(np.dot(Q,np.dot(Sigma,np.transpose(Q))),self.A)) # Q \Sigma Q^T = A
+        assert np.isclose(np.sum(Sigma),0.) # sum_ij \Sigma_ij = 0
+
+        return Sigma,Q
+
+    def get_diagonal_form(self,Sigma=None,Q=None):
+        """
+        """
+
+        if (Sigma is None) or (Q is None):
+            Sigma,Q = self.get_normal_form()
+
+        # construct W
+        sy = 1./np.sqrt(2) * np.array([[1,1],[1j,-1j]])
+        W = np.kron( np.identity(self.A.shape[0]//2),sy )
+
+        # rotate Sigma to get D, and Q to get U
+        D = np.dot(np.dot(np.matrix(W).getH(),Sigma),W)
+        U = np.dot(Q,W)
+
+        # use argsort to correctly order the spectrum, and use that to permute
+        # the columns of U
+        permutation = np.argsort(1j*np.diag(D))
+        U = U[:,permutation]
+        # sort D
+        D = D[permutation,:][:,permutation]
+
+        # tests
+        assert np.isclose(np.abs(spla.det(U)),1.) # |detU|=1
+        assert np.all(np.isclose(np.dot(U,np.conj(np.transpose(U))),np.diag(np.ones(U.shape[0])))) # U unitary
+        assert np.all(np.isclose(np.dot(U,np.dot(D,np.conj(np.transpose(U)))),self.A)) # U D U^\dagger = A
+        assert np.isclose(np.sum(D),0.) # \sum_ij D_ij = 0
+        assert np.isclose(np.trace(D),0.) # tr(D) = 0
+
+        return D,U
