@@ -5,52 +5,52 @@ import numpy as np
 import kitaevhoneycomb as kithcmb
 import parityprojectedfermions as projferms
 
-def single_link_flip(Ux,Uy,Uz):
+def single_link_flip(ux,uy,uz):
     """ 
-    Generate a new set of U arrays where one link has been flipped from
-    the arg arrays Ux,Uy,Uz
+    Generate a new set of u arrays where one link has been flipped from
+    the arg arrays ux,uy,uz
     """
     
     # choose a random u-link
-    row = np.random.randint(Ux.shape[0])
-    col = np.random.randint(Ux.shape[1])
+    row = np.random.randint(ux.shape[0])
+    col = np.random.randint(ux.shape[1])
     l = np.random.randint(3)
 
     # flip the link
     if l==0:
-        Ux[row,col] = -1*Ux[row,col]
+        ux[row,col] = -1*ux[row,col]
     elif l==1:
-        Uy[row,col] = -1*Uy[row,col]
+        uy[row,col] = -1*uy[row,col]
     elif l==2:
-        Uz[row,col] = -1*Uz[row,col]
+        uz[row,col] = -1*uz[row,col]
         
-    return Ux,Uy,Uz
+    return ux,uy,uz
 
-def add_vortex_pair(Ux,Uy,Uz):
+def add_vortex_pair(ux,uy,uz):
     """ 
-    Generate a new set of U arrays where a vortex pair has been added
-    relative to the arg arrays Ux,Uy,Uz. (This doesn't necessarily actually
+    Generate a new set of u arrays where a vortex pair has been added
+    relative to the arg arrays ux,uy,uz. (This doesn't necessarily actually
     add a pair of vortices, depending on the previous state of the system.
     It could instead move vortices or annihilate a pair.)
     """
 
     # random positions for vortices
-    row1 = np.random.randint(Ux.shape[0])
-    col1 = np.random.randint(Ux.shape[1])
-    row2 = np.random.randint(Ux.shape[0])
-    col2 = np.random.randint(Ux.shape[1])
+    row1 = np.random.randint(ux.shape[0])
+    col1 = np.random.randint(ux.shape[1])
+    row2 = np.random.randint(ux.shape[0])
+    col2 = np.random.randint(ux.shape[1])
 
     # implement flips. flip lines meet at point [row1,col2]
     # (this is robust to cases where e.g. row1==row2)
-    Uy[min(row1,row2):max(row1,row2),col2] = -1*Uy[min(row1,row2):max(row1,row2),col2]
-    Uz[row1,min(col1,col2):max(col1,col2)] = -1*Uz[row1,min(col1,col2):max(col1,col2)]
+    uy[min(row1,row2):max(row1,row2),col2] = -1*uy[min(row1,row2):max(row1,row2),col2]
+    uz[row1,min(col1,col2):max(col1,col2)] = -1*uz[row1,min(col1,col2):max(col1,col2)]
 
-    return Ux,Uy,Uz
+    return ux,uy,uz
 
-def change_topological_sector(Ux,Uy,Uz):
+def change_topological_sector(ux,uy,uz):
     """ 
     With equal probability add one of the four non-trivial loops to the
-    arg Ux,Uy,Uz arrays: column loop, row loop, both, neither.
+    arg ux,uy,uz arrays: column loop, row loop, both, neither.
     """
     
     # choose type of loop
@@ -58,15 +58,15 @@ def change_topological_sector(Ux,Uy,Uz):
 
     # add winding loop
     if loop==0:
-        Uy[:,-1] = -1*Uy[:,-1]
+        uy[:,-1] = -1*uy[:,-1]
     elif loop==1:
-        Uz[-1,:] = -1*Uz[-1,:]
+        uz[-1,:] = -1*uz[-1,:]
     elif loop==2:
-        Uy[:,-1] = -1*Uy[:,-1]
-        Uz[-1,:] = -1*Uz[-1,:]
+        uy[:,-1] = -1*uy[:,-1]
+        uz[-1,:] = -1*uz[-1,:]
     # final case is do nothing
 
-    return Ux,Uy,Uz
+    return ux,uy,uz
 
 class montacarlo(object):
     """ """
@@ -90,10 +90,10 @@ class montacarlo(object):
             if change_topological_sector:
 
                 # pack together with change_topological_sector
-                def mcmc_step(Ux,Uy,Uz):
-                    Ux,Uy,Uz = single_link_flip(Ux,Uy,Uz)
-                    Ux,Uy,Uz = change_topological_sector(Ux,Uy,Uz)
-                    return Ux,Uy,Uz
+                def mcmc_step(ux,uy,uz):
+                    ux,uy,uz = single_link_flip(ux,uy,uz)
+                    ux,uy,uz = change_topological_sector(ux,uy,uz)
+                    return ux,uy,uz
                 self.generate_proposal = mcmc_step
 
             else:
@@ -104,10 +104,10 @@ class montacarlo(object):
             if change_topological_sector:
 
             # pack together with change_topological_sector
-                def mcmc_step(Ux,Uy,Uz):
-                    Ux,Uy,Uz = add_vortex_pair(Ux,Uy,Uz)
-                    Ux,Uy,Uz = change_topological_sector(Ux,Uy,Uz)
-                    return Ux,Uy,Uz
+                def mcmc_step(ux,uy,uz):
+                    ux,uy,uz = add_vortex_pair(ux,uy,uz)
+                    ux,uy,uz = change_topological_sector(ux,uy,uz)
+                    return ux,uy,uz
                 self.generate_proposal = mcmc_step
 
             else:
@@ -122,7 +122,7 @@ class montacarlo(object):
         #
         if project_fermions:
 
-            def compute_log_partition_function(beta,Ux,Uy,Uz,khobj):
+            def compute_log_partition_function(beta,ux,uy,uz,khobj):
                 """ 
                 Version of compute_log_partition_function for the projected case.
                 """
@@ -130,17 +130,17 @@ class montacarlo(object):
                 Sigma,Q = khobj.get_normal_form()
                 spectrum =np.sort(np.sum(Sigma,axis=0))
                 # get desired parity 
-                desired_parity = projferms.get_desired_parity(Ux,Uy,Uz,Q)
+                desired_parity = projferms.get_desired_parity(ux,uy,uz,Q)
                 # compute projected partition function
                 return projferms.get_projected_log_Z(spectrum,beta,desired_parity)
 
         else:
             
-            def compute_log_partition_function(beta,Ux,Uy,Uz,khobj):
+            def compute_log_partition_function(beta,ux,uy,uz,khobj):
                 """ 
                 Version of compute_log_partition_function for the unprojected case.
 
-                here Ux,Uy,Uz are not needed, but they are included so this function has the
+                here ux,uy,uz are not needed, but they are included so this function has the
                 same signature as the projected version above.
                 """
                 # get spectrum 
@@ -150,18 +150,18 @@ class montacarlo(object):
 
         self.compute_log_partition_function = compute_log_partition_function
 
-    def metropolis_step( self,Ux,Uy,Uz,beta,curr_log_partition_func ):
+    def metropolis_step( self,ux,uy,uz,beta,curr_log_partition_func ):
         """
         Implement a move, compute the partition function of the new sector and from there 
         decide to accept or reject the change. At temp T=1/beta
         """
-        new_Ux,new_Uy,new_Uz = self.generate_proposal(Ux,Uy,Uz)
+        new_ux,new_uy,new_uz = self.generate_proposal(ux,uy,uz)
         
         # create a new kithcmb object with the new U arrays
-        new_khobj = kithcmb.kitaevhoneycomb(J=self.J,K=self.K,Ux=new_Ux,Uy=new_Uy,Uz=new_Uz)
+        new_khobj = kithcmb.kitaevhoneycomb(J=self.J,K=self.K,ux=new_ux,uy=new_uy,uz=new_uz)
         
         # get the new log partition function value
-        prop_log_partition_function = self.compute_log_partition_function(beta,new_Ux,new_Uy,new_Uz,new_khobj)
+        prop_log_partition_function = self.compute_log_partition_function(beta,new_ux,new_uy,new_uz,new_khobj)
         
         # calculate probability that change is accepted
         p = min( np.exp(prop_log_partition_function-curr_log_partition_function), 1. )
@@ -169,23 +169,23 @@ class montacarlo(object):
         # accept or reject the change
         if ( np.random.random()>p ):
             # reject
-            return Ux,Uy,Uz,curr_log_partition_func
+            return ux,uy,uz,curr_log_partition_func
         else:
             # accept
-            return new_Ux,new_Uy,new_Uz,prop_log_partition_function
+            return new_ux,new_uy,new_uz,prop_log_partition_function
 
-    def metropolis_sweep( self,Ux,Uy,Uz,beta ):
+    def metropolis_sweep( self,ux,uy,uz,beta ):
         """
         Carry out a sweep of O(L^2) metropolis steps to generate a new vortex sector at temperature T=1/beta
         """
         
         # compute the current log partition function value, need temporary kithcmb obj to compute this
-        khobj = kithcmb.kitaevhoneycomb(J=self.J,K=self.K,Ux=Ux,Uy=Uy,Uz=Uz)
-        curr_log_partition_func = self.compute_log_partition_function(beta,Ux,Uy,Uz,khobj)
+        khobj = kithcmb.kitaevhoneycomb(J=self.J,K=self.K,ux=ux,uy=uy,uz=uz)
+        curr_log_partition_func = self.compute_log_partition_function(beta,ux,uy,uz,khobj)
         
         # do O(L^2) steps
-        for m in range(Ux.size):
-            Ux,Uy,Uz,curr_log_partition_func = self.metropolis_step(Ux,Uy,Uz,beta,curr_log_partition_func)
+        for m in range(ux.size):
+            ux,uy,uz,curr_log_partition_func = self.metropolis_step(ux,uy,uz,beta,curr_log_partition_func)
 
-        return Ux,Uy,Uz
+        return ux,uy,uz
 

@@ -9,21 +9,39 @@ from scipy import linalg as spla
 # array or as a diagonal 2d array.
 #
 
-def get_desired_parity(Ux,Uy,Uz,Q):
+def get_desired_parity(ux=ux,uy=uy,uz=uz,U=None,Q=None):
     """ """
 
-    # allow for open boundaries by discarding zeros in U
-    nonzero_Ux = Ux[np.logical_not(np.isclose(Ux,0.))]
-    nonzero_Uy = Uy[np.logical_not(np.isclose(Uy,0.))]
-    nonzero_Uz = Uz[np.logical_not(np.isclose(Uz,0.))]
+    # allow for open boundaries by discarding zeros in u's'
+    nonzero_ux = ux[np.logical_not(np.isclose(ux,0.))]
+    nonzero_uy = uy[np.logical_not(np.isclose(uy,0.))]
+    nonzero_uz = uz[np.logical_not(np.isclose(uz,0.))]
 
-    desired_parity = np.cumprod(nonzero_Ux)[-1]
-    desired_parity = desired_parity * (np.cumprod(nonzero_Uy)[-1])
-    desired_parity = desired_parity * (np.cumprod(nonzero_Uz)[-1])
+    desired_parity = np.cumprod(nonzero_ux)[-1]
+    desired_parity = desired_parity * (np.cumprod(nonzero_uy)[-1])
+    desired_parity = desired_parity * (np.cumprod(nonzero_uz)[-1])
 
-    # get determinant of Q
-    detQ = spla.det(Q)
-    assert np.isclose(np.abs(detQ),1.)
+    # use either Q or U to get determinant of Q.
+    if (U is None) and not (Q is None):
+        
+        # get determinant of Q
+        detQ = spla.det(Q)
+        assert np.isclose(np.abs(detQ),1.)
+
+    elif (Q is None) and not (U is None):
+        
+        # get determinant of U
+        detU = spla.det(U)
+        assert np.isclose(np.abs(detU),1.)
+        
+        # multiply by phase factor i^(N/2)
+        detQ = detU * (1j**ux.size)
+        assert np.isclose(np.imag(detQ),0.)
+        detQ = np.real(detQ)
+
+    else:
+        print("get_desired_parity requires either Q or U as a kwarg.")
+        raise ValueError
     
     return desired_parity * detQ
 
@@ -75,7 +93,7 @@ def get_projected_log_Z(spectrum,beta,desired_parity):
         logz_odd = np.logaddexp( tmp[1] + beta*spectrum[-mode_p-1]/2., tmp[0] - beta*spectrum[-mode_p-1]/2. )
 
     # return the desired parity
-    if np.rint(np.real(desired_parity))==1:
+    if np.rint(desired_parity)==1:
         return logz_even,{}
     else:
         return logz_odd,{}
@@ -169,7 +187,7 @@ def get_projected_quasiparticle_occupations(spectrum,beta,desired_parity):
     log_particle_one_mode_expct_vals_odd = log_particle_one_mode_expct_vals_odd - logz_odd
 
     # return the desired parity
-    if np.rint(np.real(desired_parity))==1:
+    if np.rint(desired_parity)==1:
         return np.exp(log_particle_one_mode_expct_vals_even),{'log_Z':logz_even}
     else:
         return np.exp(log_particle_one_mode_expct_vals_odd),{'log_Z':logz_odd}
@@ -333,7 +351,7 @@ def _compute_projected_langle_np_nq_rangle(spectrum,beta,desired_parity):
     log_particle_two_mode_expct_vals_odd = log_particle_two_mode_expct_vals_odd - logz_odd
 
     # return the desired parity
-    if np.rint(np.real(desired_parity))==1:
+    if np.rint(desired_parity)==1:
         return logz_even,log_particle_one_mode_expct_vals_even,log_particle_two_mode_expct_vals_even
     else:
         return logz_odd,log_particle_one_mode_expct_vals_odd,log_particle_two_mode_expct_vals_odd

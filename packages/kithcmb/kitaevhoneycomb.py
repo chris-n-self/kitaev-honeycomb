@@ -4,27 +4,27 @@ import numpy as np
 from scipy import linalg as spla
 from matplotlib import pyplot as plt
 
-def make_A(J,K,Ux,Uy,Uz,resolved_idx_to_one_d):
+def make_A(J,K,ux,uy,uz,resolved_idx_to_one_d):
     """
     """
-    A = np.zeros((2*Ux.size,2*Ux.size))
+    A = np.zeros((2*ux.size,2*ux.size))
 
     # nn-links
-    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,:,1]] = J[0]*Ux
-    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0],resolved_idx_to_one_d[:,:,1]] = J[1]*Uy
-    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0],resolved_idx_to_one_d[:,:,1]] = J[2]*Uz
+    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,:,1]] = J[0]*ux
+    A[resolved_idx_to_one_d[:,(np.arange(ux.shape[1])+1)%ux.shape[1],0],resolved_idx_to_one_d[:,:,1]] = J[1]*uy
+    A[resolved_idx_to_one_d[(np.arange(ux.shape[0])+1)%ux.shape[0],:,0],resolved_idx_to_one_d[:,:,1]] = J[2]*uz
 
     # nnn-links
     # bb
-    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0],resolved_idx_to_one_d[:,:,0]] = K*Ux*Uz
-    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0]] = K*Ux*Uy
-    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],0],\
-      resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,0]] = K*Uy*Uz
+    A[resolved_idx_to_one_d[(np.arange(ux.shape[0])+1)%ux.shape[0],:,0],resolved_idx_to_one_d[:,:,0]] = K*ux*uz
+    A[resolved_idx_to_one_d[:,:,0],resolved_idx_to_one_d[:,(np.arange(ux.shape[1])+1)%ux.shape[1],0]] = K*ux*uy
+    A[resolved_idx_to_one_d[:,(np.arange(ux.shape[1])+1)%ux.shape[1],0],\
+      resolved_idx_to_one_d[(np.arange(ux.shape[0])+1)%ux.shape[0],:,0]] = K*uy*uz
     # ww
-    A[resolved_idx_to_one_d[:,:,1],resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,1]] = K*Ux[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]*Uz
-    A[resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],1],resolved_idx_to_one_d[:,:,1]] = K*Ux[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]*Uy
-    A[resolved_idx_to_one_d[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:,1],\
-      resolved_idx_to_one_d[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1],1]] = K*Uy[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]*Uz[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]
+    A[resolved_idx_to_one_d[:,:,1],resolved_idx_to_one_d[(np.arange(ux.shape[0])+1)%ux.shape[0],:,1]] = K*ux[(np.arange(ux.shape[0])+1)%ux.shape[0],:]*uz
+    A[resolved_idx_to_one_d[:,(np.arange(ux.shape[1])+1)%ux.shape[1],1],resolved_idx_to_one_d[:,:,1]] = K*ux[:,(np.arange(ux.shape[1])+1)%ux.shape[1]]*uy
+    A[resolved_idx_to_one_d[(np.arange(ux.shape[0])+1)%ux.shape[0],:,1],\
+      resolved_idx_to_one_d[:,(np.arange(ux.shape[1])+1)%ux.shape[1],1]] = K*uy[(np.arange(ux.shape[0])+1)%ux.shape[0],:]*uz[:,(np.arange(ux.shape[1])+1)%ux.shape[1]]
 
     # symmetrise
     A = A - np.transpose(A)
@@ -42,24 +42,24 @@ class kitaevhoneycomb(object):
         assert len(self.J)==3
         self.K = kwargs['K']
 
-        Ux,Uy,Uz = np.array(kwargs['Ux']),np.array(kwargs['Uy']),np.array(kwargs['Uz'])
-        assert Ux.shape==Uy.shape
-        assert Ux.shape==Uz.shape
+        ux,uy,uz = np.array(kwargs['ux']),np.array(kwargs['uy']),np.array(kwargs['uz'])
+        assert ux.shape==uy.shape
+        assert ux.shape==uz.shape
 
         # tensors that convert between different indexing of the sites
-        self.resolved_index_to_one_d = np.zeros((Ux.shape[0],Ux.shape[1],2),dtype=np.int32)
-        self.resolved_index_to_one_d[:,:,0] = np.arange(Ux.size).reshape((Ux.shape[0],Ux.shape[1])) # b sites
-        self.resolved_index_to_one_d[:,:,1] = Ux.size + np.arange(Ux.size).reshape((Ux.shape[0],Ux.shape[1])) # w sites
-        self.one_d_index_to_resolved = np.zeros((2*Ux.size,3),dtype=np.int32)
-        self.one_d_index_to_resolved[:,0] = (np.arange(2*Ux.size)%Ux.size)//Ux.shape[1] # row index
-        self.one_d_index_to_resolved[:,1] = (np.arange(2*Ux.size)%Ux.size)%Ux.shape[1] # col index
-        self.one_d_index_to_resolved[:,2] = np.arange(2*Ux.size)//Ux.size # bw value
+        self.resolved_index_to_one_d = np.zeros((ux.shape[0],ux.shape[1],2),dtype=np.int32)
+        self.resolved_index_to_one_d[:,:,0] = np.arange(ux.size).reshape((ux.shape[0],ux.shape[1])) # b sites
+        self.resolved_index_to_one_d[:,:,1] = ux.size + np.arange(ux.size).reshape((ux.shape[0],ux.shape[1])) # w sites
+        self.one_d_index_to_resolved = np.zeros((2*ux.size,3),dtype=np.int32)
+        self.one_d_index_to_resolved[:,0] = (np.arange(2*ux.size)%ux.size)//ux.shape[1] # row index
+        self.one_d_index_to_resolved[:,1] = (np.arange(2*ux.size)%ux.size)%ux.shape[1] # col index
+        self.one_d_index_to_resolved[:,2] = np.arange(2*ux.size)//ux.size # bw value
 
         # tensor to give the real-space position of sites
         a1 = np.array([np.sqrt(3),0.])
         a2 = np.array([np.sqrt(3)/2,-3./2])
         bw_vector = np.array([np.sqrt(3)/2,-1./2])
-        self.real_space_positions = np.zeros((2*Ux.size,2))
+        self.real_space_positions = np.zeros((2*ux.size,2))
         self.real_space_positions[:,0] = self.one_d_index_to_resolved[:,0]*a2[0] +\
                                     self.one_d_index_to_resolved[:,1]*a1[0] +\
                                     self.one_d_index_to_resolved[:,2]*bw_vector[0]
@@ -68,13 +68,13 @@ class kitaevhoneycomb(object):
                                     self.one_d_index_to_resolved[:,2]*bw_vector[1]
 
         # compute A matrix
-        self.A = make_A(self.J,self.K,Ux,Uy,Uz,self.resolved_index_to_one_d)
+        self.A = make_A(self.J,self.K,ux,uy,uz,self.resolved_index_to_one_d)
 
         # identify vortices
-        self.vortices = Uz[:,:]*Uy[:,:]*Ux[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]\
-                        *Uz[:,(np.arange(Ux.shape[1])+1)%Ux.shape[1]]\
-                        *Ux[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]\
-                        *Uy[(np.arange(Ux.shape[0])+1)%Ux.shape[0],:]
+        self.vortices = uz[:,:]*uy[:,:]*ux[:,(np.arange(ux.shape[1])+1)%ux.shape[1]]\
+                        *uz[:,(np.arange(ux.shape[1])+1)%ux.shape[1]]\
+                        *ux[(np.arange(ux.shape[0])+1)%ux.shape[0],:]\
+                        *uy[(np.arange(ux.shape[0])+1)%ux.shape[0],:]
 
     def draw_resolved_labelling(self,display_fig=True,filename=None,**savefigkwargs):
         """
