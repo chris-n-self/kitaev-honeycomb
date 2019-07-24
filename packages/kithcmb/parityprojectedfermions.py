@@ -141,7 +141,8 @@ def get_unprojected_quasiparticle_occupations(spectrum,T):
     log_particle_expectation_values = (-beta*spectrum/2.-np.logaddexp(-beta*spectrum/2.,beta*spectrum/2.))
 
     # for consistency with the projected method below we also calculate the log_partition function
-    return np.exp(log_particle_expectation_values),{'log_Z':get_unprojected_log_Z(spectrum,T)}
+    log_Z,extras = get_unprojected_log_Z(spectrum,T)
+    return np.exp(log_particle_expectation_values),{'log_Z':log_Z}
 
 def get_projected_quasiparticle_occupations(spectrum,T,desired_parity):
     """
@@ -251,8 +252,13 @@ def get_projected_thermal_energy(spectrum,T,desired_parity):
     """
     beta = _safe_T_to_beta(T)
 
-    log_z,particle_expectation_values = get_projected_quasiparticle_occupations(spectrum,T,desired_parity)
-    return np.sum(spectrum*(particle_expectation_values-0.5)),{'log_Z':log_z,'quasi_occs':particle_expectation_values}
+    particle_expectation_values,extras = get_projected_quasiparticle_occupations(spectrum,T,desired_parity)
+    extras['quasi_occs'] = particle_expectation_values
+
+    # get positive half of spectrum, in descending order
+    spectrum = np.abs(spectrum[spectrum.size//2:])[::-1]
+
+    return np.sum(spectrum*(particle_expectation_values-0.5)),extras
 
 # 
 # ------------------------------------------------------
