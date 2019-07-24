@@ -1,2 +1,9 @@
 # ignore mac finder data
 *.DS_Store
+
+# ignore compiled python junk
+*__pycache__*
+*.pyc
+
+# ignore ipynb_checkpoints folders
+*.ipynb_checkpoints*

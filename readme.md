@@ -3,9 +3,9 @@
 Python package to simulate the Kitaev honeycomb model
 
 ## Contents
-* [Setup](##setup)
-* [Usage](##usage)
-* [Examples](##examples)
+* [Setup](#setup)
+* [Usage](#usage)
+* [Examples](#examples)
 
 ## Setup
 
@@ -29,27 +29,31 @@ This module contains a class definition, also called `kitaevhoneycomb`. Objects 
 
 The arguments to the class are all passed as keyword arguments. They are the coupling strengths of the model `J` and `K`, as well as the link gauge variables `ux`, `uy`, `uz`, example:
 
-	# system size
-	Lrows,Lcols = 10,10
+```python
+# system size
+Lrows,Lcols = 10,10
 
-	# middle of the phase diagram with a small gap at the fermi points
-	J = [1,1,1]
-	K = 0.1
+# middle of the phase diagram with a small gap at the fermi points
+J = [1,1,1]
+K = 0.1
 
-	# no-vortex sector
-	ux = np.ones((Lrows,Lcols),dtype=np.int8)
-    uy = np.ones((Lrows,Lcols),dtype=np.int8)
-    uz = np.ones((Lrows,Lcols),dtype=np.int8)
+# no-vortex sector
+ux = np.ones((Lrows,Lcols),dtype=np.int8)
+uy = np.ones((Lrows,Lcols),dtype=np.int8)
+uz = np.ones((Lrows,Lcols),dtype=np.int8)
 
-	# initialse object
-	ky_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
+# initialse object
+ky_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
 
-	# draw the system
-	kh_sys.draw_system()
+# draw the system
+kh_sys.draw_system()
+```
 
 The link variables `u` encode the vortex (and topological) sector, but they can also be used to implement __different boundary conditions__. For example a cylinder can be created by setting a row of `uz` to zero
 
-	uz[-1,:] = 0
+```python
+uz[-1,:] = 0
+```
 
 Typically the `u` arrays will only have values +1, -1 and 0, hence why they are constructed with the data type `np.int8` in the example. However, the class should still work without them being integers. 
 
@@ -61,7 +65,9 @@ The module has a special function `get_desired_parity` that computes the physica
 
 All other functions have two versions `get_unprojected_*` and `get_projected_*`, they have the same arguments but the projected version takes an additional argument which is the physical parity. All of these functions have the same return signatures, to give an example:
 
-	thermal_energy,extras = parityprojectedfermions.get_projected_thermal_energy(spectrum,beta,+1)
+```python
+thermal_energy,extras = parityprojectedfermions.get_projected_thermal_energy(spectrum,T,+1)
+```
 
 where `thermal_energy` is the result of the computation and `extras` is a dictionary of other physical quantities that were calculated in the process of computing the thermal energy. For example in the case of thermal energy these are the quasiparticle occupancies and the fermionic partition function. 
 
@@ -79,75 +85,129 @@ The keyword argument `MC_step_type` sets the type of Markov step proposals. It c
 
 Here are some simple examples of using each of the modules. More examples can be found in the `examples` directory.
 
-#### Computing the spectrum for a fixed vortex sector
+#### Computing the spectrum for a fixed vortex sector (`kitaevhoneycomb`)
 
-    import numpy as np
-    from kithcmb import kitaevhoneycomb
-    from matplotlib import pyplot as plt
+```python
+import numpy as np
+from kithcmb import kitaevhoneycomb
+from matplotlib import pyplot as plt
 
-    # fix the parameter values and system size
-    J = [1,1,1]
-    K = 0.1
-    Lrows,Lcols = 10,10
+# fix the parameter values and system size
+J = [1,1,1]
+K = 0.1
+Lrows,Lcols = 10,10
 
-    # fix the values of the gauge fields. start from the no-vortex sector
-    ux = np.ones((Lrows,Lcols),dtype=np.int8)
-    uy = np.ones((Lrows,Lcols),dtype=np.int8)
-    uz = np.ones((Lrows,Lcols),dtype=np.int8)
-    
-    # insert a pair of vortices by flipping a line of uz's
-    uz[Lrows//2,Lcols//4:3*Lcols//4] = -1
+# fix the values of the gauge fields. start from the no-vortex sector
+ux = np.ones((Lrows,Lcols),dtype=np.int8)
+uy = np.ones((Lrows,Lcols),dtype=np.int8)
+uz = np.ones((Lrows,Lcols),dtype=np.int8)
 
-    # initialise kitaevhoneycomb object
-    kh_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
+# insert a pair of vortices by flipping a line of uz's
+uz[Lrows//2,Lcols//4:3*Lcols//4] = -1
 
-    # (optionally) draw the system to see location of vortices
-    kh_sys.draw_system()
+# initialise kitaevhoneycomb object
+kh_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
 
-    # diagonalise
-    spectrum = kh_sys.get_spectrum()
+# (optionally) draw the system to see location of vortices, note this is slow
+kh_sys.draw_system()
 
-    # plot the spectrum
-    fig,ax = plt.subplots()
-    ax.plot(spectrum,'.')
-    plt.show()
+# obtain spectrum
+spectrum = kh_sys.get_spectrum()
 
-#### Obtaining the correlation matrix for a fixed vortex sector
+# plot the spectrum
+fig,ax = plt.subplots(figsize=(8,6))
+plt.title('spectrum',fontsize=24)
+ax.plot(spectrum,'.')
+ax.set_ylabel(r'$\varepsilon$',fontsize=24)
+plt.show()
+```
 
-    import numpy as np
-    from kithcmb import kitaevhoneycomb
-    from kithcmb import parityprojectedfermions
-    from matplotlib import pyplot as plt
+#### Obtaining the correlation matrix for a fixed vortex sector (`parityprojectedfermions`)
 
-    # temperature to compute correlation matrix at, set to zero
-    T = 1E-6
+```python
+import numpy as np
+from kithcmb import kitaevhoneycomb
+from kithcmb import parityprojectedfermions
+from matplotlib import pyplot as plt
 
-    # fix the parameter values and system size
-    J = [1,1,1]
-    K = 0.1
-    Lrows,Lcols = 10,10
+# temperature to compute correlation matrix at, set to zero
+T = 0.
 
-    # fix the values of the gauge fields. start from the no-vortex sector
-    ux = np.ones((Lrows,Lcols),dtype=np.int8)
-    uy = np.ones((Lrows,Lcols),dtype=np.int8)
-    uz = np.ones((Lrows,Lcols),dtype=np.int8)
+# fix the parameter values and system size
+J = [1,1,1]
+K = 0.1
+Lrows,Lcols = 10,10
 
-    # go to the full vortex sector by flipping every second uz along rows
-    uz[:,::2] = -1
+# fix the values of the gauge fields. start from the no-vortex sector
+ux = np.ones((Lrows,Lcols),dtype=np.int8)
+uy = np.ones((Lrows,Lcols),dtype=np.int8)
+uz = np.ones((Lrows,Lcols),dtype=np.int8)
 
-    # initialise kitaevhoneycomb object
-    kh_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
+# go to the full vortex sector by flipping every second uz along rows
+uz[:,::2] = -1
 
-    # (optionally) draw the system to see location of vortices
-    kh_sys.draw_system()
+# initialise kitaevhoneycomb object
+kh_sys = kitaevhoneycomb.kitaevhoneycomb(J=J,K=K,ux=ux,uy=uy,uz=uz) 
 
-    # obtain eigenvectors and eigenvalues of A matrix
-    D,U = kh_sys.get_diagonal_form()
+# (optionally) draw the system to see location of vortices, note this is slow
+kh_sys.draw_system()
 
-	# -------------
-    # version 1: obtain the correlation matrix without parity constraint
-    # -------------
-    corr_mat = parityprojectedfermions.get_unprojected_correlation_matrix()
+# obtain eigenvectors and eigenvalues of A matrix
+D,U = kh_sys.get_diagonal_form()
 
+# plot spectrum
+fig,ax = plt.subplots(figsize=(8,6))
+ax.plot(np.diag(np.real(1j*D)),'.')
+plt.title('spectrum',fontsize=24)
+ax.set_ylabel(r'$\varepsilon$',fontsize=24)
+plt.show()
+
+# -------------
+# version 1: obtain the correlation matrix WITHOUT parity constraint
+# -------------
+print('\n'+'-'*30+'\n'+'UNPROJECTED'+'\n'+'-'*30+'\n')
+corr_mat,extras = parityprojectedfermions.get_unprojected_correlation_matrix(D,U,T)
+
+# plot the quasipaticle occupations in extras
+fig,ax = plt.subplots(figsize=(8,6))
+ax.plot(extras['quasi_occs'],'.')
+plt.title('quasiparticle occupations',fontsize=24)
+plt.show()
+
+# plot real and imaginary part of correlation matrix
+fig,(axl,axr) = plt.subplots(1,2,figsize=(16,6))
+plt.suptitle('correlation matrix',fontsize=24)
+im = axl.imshow(np.real(corr_mat))
+plt.colorbar(im,ax=axl)
+axl.set_title('real',fontsize=22)
+im = axr.imshow(np.imag(corr_mat))
+plt.colorbar(im,ax=axr)
+axr.set_title('imag',fontsize=22)
+plt.show()
+
+# -------------
+# version 2: obtain the correlation matrix WITH parity constraint
+# -------------
+print('\n'+'-'*30+'\n'+'PROJECTED'+'\n'+'-'*30+'\n')
+desired_parity = parityprojectedfermions.get_desired_parity(ux=ux,uy=uy,uz=uz,U=U)
+corr_mat,extras = parityprojectedfermions.get_projected_correlation_matrix(D,U,T,desired_parity)
+
+# plot the quasipaticle occupations in extras
+fig,ax = plt.subplots(figsize=(8,6))
+ax.plot(extras['quasi_occs'],'.')
+plt.title('quasiparticle occupations',fontsize=24)
+plt.show()
+
+# plot real and imaginary part of correlation matrix
+fig,(axl,axr) = plt.subplots(1,2,figsize=(16,6))
+plt.suptitle('correlation matrix',fontsize=24)
+im = axl.imshow(np.real(corr_mat))
+plt.colorbar(im,ax=axl)
+axl.set_title('real',fontsize=22)
+im = axr.imshow(np.imag(corr_mat))
+plt.colorbar(im,ax=axr)
+axr.set_title('imag',fontsize=22)
+plt.show()
+```
 
 #### Estimating the thermal energy averaging over vortex sectors
