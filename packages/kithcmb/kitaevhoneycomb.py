@@ -296,6 +296,9 @@ class kitaevhoneycomb(object):
 
     def get_diagonal_form(self,Sigma=None,Q=None):
         """
+        returns: diagonal matrix D with the eigenvalues ordered from most negative to most 
+        positive (the spectrum is given by the diagonal elements of iD), eigenvector matrix
+        U with the columns ordered in the corresponding order to D
         """
 
         if (Sigma is None) or (Q is None):

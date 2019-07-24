@@ -43,7 +43,7 @@ def get_unprojected_log_Z(spectrum,beta):
     spectrum = np.abs(spectrum[spectrum.size//2:])
 
     # use logaddexp mode-wise and then sum over modes
-    return np.sum(np.logaddexp(-1.*spectrum*beta/2.,-(-1.*spectrum)*beta/2.))
+    return np.sum(np.logaddexp(-1.*spectrum*beta/2.,-(-1.*spectrum)*beta/2.)),{}
 
 def get_projected_log_Z(spectrum,beta,desired_parity):
     """
@@ -76,9 +76,9 @@ def get_projected_log_Z(spectrum,beta,desired_parity):
 
     # return the desired parity
     if np.rint(np.real(desired_parity))==1:
-        return logz_even
+        return logz_even,{}
     else:
-        return logz_odd
+        return logz_odd,{}
 
 #
 # ---------------------------------------------------------------------
@@ -86,7 +86,7 @@ def get_projected_log_Z(spectrum,beta,desired_parity):
 # ---------------------------------------------------------------------
 #
 
-def get_unprojected_occupations(spectrum,beta):
+def get_unprojected_quasiparticle_occupations(spectrum,beta):
     """
     this function computes the expectation values of fermionic occupation operators at temperature beta=1/T
     without projection
@@ -104,9 +104,9 @@ def get_unprojected_occupations(spectrum,beta):
     log_particle_expectation_values = (-beta*spectrum/2.-np.logaddexp(-beta*spectrum/2.,beta*spectrum/2.))
 
     # for consistency with the projected method below we also calculate the log_partition function
-    return unprojected_log_partition_function(spectrum,beta),np.exp(log_particle_expectation_values)
+    return np.exp(log_particle_expectation_values),{'log_Z':get_unprojected_log_Z(spectrum,beta)}
 
-def get_projected_occupations(spectrum,beta,desired_parity):
+def get_projected_quasiparticle_occupations(spectrum,beta,desired_parity):
     """
     this function computes the expectation values of fermionic occupation operators at temperature beta=1/T
     only summing over states in the correct parity subspace
@@ -170,9 +170,9 @@ def get_projected_occupations(spectrum,beta,desired_parity):
 
     # return the desired parity
     if np.rint(np.real(desired_parity))==1:
-        return logz_even,np.exp(log_particle_one_mode_expct_vals_even)
+        return np.exp(log_particle_one_mode_expct_vals_even),{'log_Z':logz_even}
     else:
-        return logz_odd,np.exp(log_particle_one_mode_expct_vals_odd)
+        return np.exp(log_particle_one_mode_expct_vals_odd),{'log_Z':logz_odd}
 
 #
 # ---------------------------------------------------------
@@ -193,8 +193,13 @@ def get_unprojected_thermal_energy(spectrum,beta):
     # get positive half of spectrum, in descending order
     spectrum = np.abs(spectrum[spectrum.size//2:])
 
+    # compute thermal energy
     E = np.sum(-1.*(spectrum/2.0)*np.tanh(beta*spectrum/2.))
-    return E
+
+    # get logZ and quasiparticle occupations, to be consistent with the return type of get_projected_thermal_energy
+    logz,quasi_occs = get_unprojected_quasiparticle_occupations(spectrum,beta)
+
+    return E,{'log_Z':logz,'quasi_occs':quasi_occs}
 
 def get_projected_thermal_energy(spectrum,beta,desired_parity):
     """
@@ -203,8 +208,8 @@ def get_projected_thermal_energy(spectrum,beta,desired_parity):
     we compute the statistical thermal energy \sum_k \en_k ( n_k - 1/2) 
     directly from the particle expct vals
     """
-    log_z,particle_expectation_values = projected_occupations(spectrum,beta,desired_parity)
-    return np.sum(spectrum*(particle_expectation_values-0.5))
+    log_z,particle_expectation_values = get_projected_quasiparticle_occupations(spectrum,beta,desired_parity)
+    return np.sum(spectrum*(particle_expectation_values-0.5)),{'log_Z':log_z,'quasi_occs':particle_expectation_values}
 
 # 
 # ------------------------------------------------------
@@ -212,7 +217,7 @@ def get_projected_thermal_energy(spectrum,beta,desired_parity):
 # ------------------------------------------------------
 # 
 
-def get_projected_langle_np_nq_rangle(spectrum,beta,desired_parity):
+def _compute_projected_langle_np_nq_rangle(spectrum,beta,desired_parity):
     """ 
     here we compute < n_k n_l > occupation correlation eigenvalues, we compute for l > k and then
     symmetrise
@@ -344,7 +349,7 @@ def get_projected_covariance_matrix(spectrum,beta,desired_parity):
         spectrum = np.diag(spectrum)
 
     number_modes = spectrum.size//2
-    logz,log_particle_one_mode_expct_vals,log_particle_two_mode_expct_vals = get_projected_langle_np_nq_rangle(spectrum,beta,desired_parity)
+    logz,log_particle_one_mode_expct_vals,log_particle_two_mode_expct_vals = _compute_projected_langle_np_nq_rangle(spectrum,beta,desired_parity)
     particle_one_mode_expct_vals = np.exp(log_particle_one_mode_expct_vals)
     expt_nn = np.exp(log_particle_two_mode_expct_vals)
 
@@ -357,4 +362,47 @@ def get_projected_covariance_matrix(spectrum,beta,desired_parity):
     # covariance matrix = <n_p n_q> - <n_p><n_q>
     mode_occ_covariance_mat = expt_nn - exptn_exptn
 
-    return logz,log_particle_one_mode_expct_vals,mode_occ_covariance_mat
+    return mode_occ_covariance_mat,{'log_Z':logz,'quasi_occs':np.exp(log_particle_one_mode_expct_vals)}
+
+# 
+# -------------------------------------------------
+# compute fermionic correlation matrix <c_i c_j>
+# -------------------------------------------------
+# 
+
+def _compute_correlation_matrix(quasi_occs,U):
+    """ """
+
+    # symmetrise the quasiparticle occupations so it contains both the particle
+    # and (redundant) hole information to match the U matrix
+    full_quasi_occs = np.zeros(2*quasi_occs.size)
+    full_quasi_occs[:quasi_occs.size] = 1-quasi_occs # holes
+    full_quasi_occs[quasi_occs.size:] = quasi_occs[::-1] # particles, in order of increasing energy
+    full_quasi_occs = np.diag(full_quasi_occs)
+
+    return np.dot(U,np.dot(full_quasi_occs,U.conj().T))
+
+def get_projected_correlation_matrix(D,U,beta,desired_parity):
+    """ """
+
+    # convert D matrix to spectrum
+    spectrum = 1j*D
+
+    # get the quasiparticle occupations
+    quasi_occs,extras = get_projected_quasiparticle_occupations(spectrum,beta)
+    extras['quasi_occs'] = quasi_occs
+
+    return _compute_correlation_matrix(quasi_occs,U),extras
+
+def get_unprojected_correlation_matrix(D,U,beta):
+    """ """
+
+    # convert D matrix to spectrum
+    spectrum = 1j*D
+
+    # get the quasiparticle occupations
+    quasi_occs,extras = get_unprojected_quasiparticle_occupations(spectrum,beta)
+    extras['quasi_occs'] = quasi_occs
+
+    return _compute_correlation_matrix(quasi_occs,U),extras
+

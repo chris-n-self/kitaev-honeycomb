@@ -4,8 +4,7 @@
 
 Clone the repository onto your machine. 
 
-The package is called `kithcmb` and is in the `packages` folder. To make the package accessible from anywhere add the package to your python path environment variable. This can be done to putting the following in your `~/.bash_profile` file:  
-`export PYTHONPATH="$PYTHONPATH:/path/to/repository/packages"`
+The package is called `kithcmb` and is in the `packages` folder. To make the package accessible from anywhere add the package to your python path environment variable. This can be done to putting the following in your `~/.bash_profile` file: `export PYTHONPATH="$PYTHONPATH:/path/to/repository/packages"`
 
 Import the package to python using `import kithcmb`.
 
@@ -17,9 +16,9 @@ There are three modules in the package:
 `parityprojectedfermions`  
 `montecarlo`
 
-The first module `kitaevhoneycomb` contains a class definition, also called `kitaevhoneycomb`. Objects of this class represent a realisation of the kitaev honeycomb model for a fixed vortex sector. The class provides methods to diagonalise the sector and obtain the spectrum and eigenvectors.  
+The first module `kitaevhoneycomb` contains a class definition, also called `kitaevhoneycomb`. Objects of this class represent a realisation of the kitaev honeycomb model for a __fixed vortex sector__. The class provides methods to diagonalise the sector and obtain the spectrum and eigenvectors.  
 
-Module `parityprojectedfermions` contains functions that take the spectrum (and possibly eigenvectors) output by `kitaevhoneycomb` objects and compute finite temperature observables such as the thermal energy or the fermionic correlation matrix. Fermionic states of the kitaev honeycomb are subject to a global quasiparticle parity constraint, each function in the module has a version that obeys the parity constraint and another version that ignores it.
+Module `parityprojectedfermions` contains functions that take the spectrum (and possibly eigenvectors) output by `kitaevhoneycomb` objects and compute finite temperature observables of the fermions such as the thermal energy or the correlation matrix, $\langle c_i c_j \rangle$. Fermionic states of the kitaev honeycomb are subject to a global quasiparticle parity constraint, each function in the module has a version that obeys the parity constraint and another version that ignores it.
 
 The final module `montecarlo` generates a sequence of random vortex sectors, where each vortex sector occurs with the probability it would have in the thermal distribution over all vortex sectors. It does this using a Markov chain Monte Carlo approach. This can be used to estimate finite temperature observables for the complete model.
 
@@ -53,11 +52,11 @@ Here are some simple examples of using each of the modules. More examples can be
     kh_sys.draw_system()
 
     # diagonalise
-    D,U = kh_sys.get_diagonal_form()
+    spectrum = kh_sys.get_spectrum()
 
     # plot the spectrum
     fig,ax = plt.subplots()
-    ax.plot(np.diag(D),'.')
+    ax.plot(spectrum,'.')
     plt.show()
 
 #### Obtaining the correlation matrix for a fixed vortex sector
