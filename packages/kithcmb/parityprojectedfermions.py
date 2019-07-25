@@ -1,6 +1,5 @@
 # 09/05/19
 # Chris Self
-import copy
 import numpy as np
 from scipy import linalg as spla
 
@@ -199,8 +198,8 @@ def get_projected_quasiparticle_occupations(spectrum,T,desired_parity):
         # single mode,
         # for modes<mode_p, add the sum over mode_p's marginal probabilities i.e. trace it out
         # ------------
-        tmp = copy.deepcopy(log_particle_one_mode_expct_vals_even),\
-                copy.deepcopy(log_particle_one_mode_expct_vals_odd)
+        tmp = np.array(log_particle_one_mode_expct_vals_even,copy=True),\
+                np.array(log_particle_one_mode_expct_vals_odd,copy=True)
         log_particle_one_mode_expct_vals_even[:mode_p] = np.logaddexp( tmp[0][:mode_p] + beta*spectrum[-mode_p-1]/2., tmp[1][:mode_p] - beta*spectrum[-mode_p-1]/2. )
         log_particle_one_mode_expct_vals_odd[:mode_p] = np.logaddexp( tmp[1][:mode_p] + beta*spectrum[-mode_p-1]/2., tmp[0][:mode_p] - beta*spectrum[-mode_p-1]/2. )
 
@@ -334,8 +333,8 @@ def _compute_projected_langle_np_nq_rangle(spectrum,T,desired_parity):
         # single mode,
         # for modes<mode_p, add the sum over mode_p's marginal probabilities i.e. trace it out
         # ------------
-        tmp = copy.deepcopy(log_particle_one_mode_expct_vals_even),\
-                copy.deepcopy(log_particle_one_mode_expct_vals_odd)
+        tmp = np.array(log_particle_one_mode_expct_vals_even,copy=True),\
+                np.array(log_particle_one_mode_expct_vals_odd,copy=True)
         log_particle_one_mode_expct_vals_even[:mode_p] = np.logaddexp( tmp[0][:mode_p] + beta*spectrum[-mode_p-1]/2., tmp[1][:mode_p] - beta*spectrum[-mode_p-1]/2. )
         log_particle_one_mode_expct_vals_odd[:mode_p] = np.logaddexp( tmp[1][:mode_p] + beta*spectrum[-mode_p-1]/2., tmp[0][:mode_p] - beta*spectrum[-mode_p-1]/2. )
         # ------------
@@ -344,8 +343,8 @@ def _compute_projected_langle_np_nq_rangle(spectrum,T,desired_parity):
         # row=mode_p,col=:mode_p i.e. up to diagonal
         # these will already include the occ prob for mode col
         # ------------
-        tmp = copy.deepcopy(log_particle_two_mode_expct_vals_even),\
-                copy.deepcopy(log_particle_two_mode_expct_vals_odd)
+        tmp = np.array(log_particle_two_mode_expct_vals_even,copy=True),\
+                np.array(log_particle_two_mode_expct_vals_odd,copy=True)
         log_particle_two_mode_expct_vals_even[mode_p,:mode_p] = np.logaddexp( tmp[0][mode_p,:mode_p] - _big_num, tmp[1][mode_p,:mode_p] - beta*spectrum[-mode_p-1]/2. )
         log_particle_two_mode_expct_vals_odd[mode_p,:mode_p] = np.logaddexp( tmp[1][mode_p,:mode_p] - _big_num, tmp[0][mode_p,:mode_p] - beta*spectrum[-mode_p-1]/2. )
 

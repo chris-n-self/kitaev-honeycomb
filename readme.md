@@ -1,11 +1,11 @@
 # Kitaev Honeycomb in Python
 
-Python package to simulate the Kitaev honeycomb model
+Python package to simulate the Kitaev honeycomb model and compute finite temperature quantities
 
 ## Contents
-* [Setup](#setup)
-* [Usage](#usage)
-* [Examples](#examples)
+* [__Setup__](#setup)
+* [__Usage__](#usage)
+* [__Examples__](#examples)
 
 ## Setup
 
@@ -14,6 +14,10 @@ Clone the repository onto your machine.
 The package is called `kithcmb` and is in the `packages` folder. To make the package accessible from anywhere add the package to your python path environment variable. This can be done to putting the following in your `~/.bash_profile` file: `export PYTHONPATH="$PYTHONPATH:/path/to/repository/packages"`
 
 Import the package to python using `import kithcmb`.
+
+#### Compatibility
+
+The package requires numpy, scipy and matplotlib. Currently it should work with python 2.7 and python 3.
 
 ## Usage
 
@@ -218,14 +222,13 @@ from kithcmb import kitaevhoneycomb
 from kithcmb import parityprojectedfermions
 from kithcmb import montecarlo
 from matplotlib import pyplot as plt
-%matplotlib inline
 
 # set of temperatures to compute thermal energy and vortex density at
 T_vals = np.logspace(-3,3,7)
 thermal_energies = np.zeros(T_vals.size)
 vortex_densities = np.zeros(T_vals.size)
 
-# number of rounds of Monte Carlo steps to carry out at each temperature 
+# number of rounds of Monte Carlo to carry out at each temperature 
 mcmc_rounds = 1000
 
 # fix the parameter values and system size
@@ -238,7 +241,7 @@ for Tidx,T in enumerate(T_vals):
 
     # initialise montecarlo object, this uses default options:
     # MC_step_type='vortex',change_topo_sector=True,project_fermions=True
-    mcmc_obj = montecarlo.montecarlo(J=J,K=K,project_fermions=False)
+    mcmc_obj = montecarlo.montecarlo(J=J,K=K)
     
     # store Monte Carlo timeseries of computed values
     thermal_energy_timeseries = np.zeros(mcmc_rounds)
@@ -286,7 +289,10 @@ for Tidx,T in enumerate(T_vals):
     # allow for burn-in and compute averages with last 90% of timeseries
     thermal_energies[Tidx] = np.mean(thermal_energy_timeseries[mcmc_rounds//10:])
     vortex_densities[Tidx] = np.mean(vortex_density_timeseries[mcmc_rounds//10:])
-    
+ 
+#
+# plot average thermal energies and vortex densities as functions of temperature
+#
 fig,ax = plt.subplots(figsize=(8,6))
 ax.plot(T_vals,thermal_energies,'o-',markerfacecolor='w',markersize=12)
 ax.set_xscale('log')

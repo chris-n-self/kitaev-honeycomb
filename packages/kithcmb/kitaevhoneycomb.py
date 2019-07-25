@@ -76,19 +76,24 @@ class kitaevhoneycomb(object):
                         *ux[(np.arange(ux.shape[0])+1)%ux.shape[0],:]\
                         *uy[(np.arange(ux.shape[0])+1)%ux.shape[0],:]
 
-    def draw_resolved_labelling(self,display_fig=True,filename=None,**savefigkwargs):
+    def draw_resolved_labelling(self,display_fig=True,filename=None,figsizeboost=1.,**savefigkwargs):
         """
         draw the lattice with the resolved labelling annotated
         """
-        fscale = self.vortices.shape[0]/10.
+        fscale = figsizeboost*self.vortices.shape[0]/10.
         fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
         ax.set_aspect('equal')
         plt.axis('off')
 
         bw_vector = np.array([np.sqrt(3)/2,-1./2])
         for row,col,bw in self.one_d_index_to_resolved[self.one_d_index_to_resolved[:,2]==1]:
+            ax.annotate('1',xy=tuple(self.real_space_positions[self.resolved_index_to_one_d[row,col,bw]]-np.array([0.,0.25*bw_vector[1]])),fontsize=7*figsizeboost)
+            ax.annotate('0',xy=tuple(self.real_space_positions[self.resolved_index_to_one_d[row,col,bw]]-bw_vector-np.array([0.,0.25*bw_vector[1]])),fontsize=7*figsizeboost)
+
+            pos = self.real_space_positions[self.resolved_index_to_one_d[row,col,bw]]-np.array([0.5*bw_vector[0],1.5*bw_vector[1]])
+            ax.annotate("("+"{0:.3g}".format(row)+","+"{0:.3g}".format(col)+")",xy=tuple(pos),fontsize=8*figsizeboost,rotation=30)
+
             pos = self.real_space_positions[self.resolved_index_to_one_d[row,col,bw]]-bw_vector/2.
-            ax.annotate("("+"{0:.3g}".format(row)+","+"{0:.3g}".format(col)+")",xy=tuple(pos))
             ax.plot([(pos-bw_vector/2.)[0],(pos+bw_vector/2.)[0]],[(pos-bw_vector/2.)[1],(pos+bw_vector/2.)[1]],'k')
 
         for bw in [0,1]:
@@ -103,11 +108,11 @@ class kitaevhoneycomb(object):
         else:
             plt.close()
 
-    def draw_one_d_labelling(self,display_fig=True,filename=None,**savefigkwargs):
+    def draw_one_d_labelling(self,display_fig=True,filename=None,figsizeboost=1.,**savefigkwargs):
         """
         draw the lattice with the one-d site labelling annotated
         """
-        fscale = self.vortices.shape[0]/10.
+        fscale = figsizeboost*self.vortices.shape[0]/10.
         fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
         ax.set_aspect('equal')
         plt.axis('off')
@@ -118,7 +123,7 @@ class kitaevhoneycomb(object):
             
         for site in np.arange(2*self.vortices.size):
             pos = self.real_space_positions[site]
-            ax.annotate(str(site),xy=pos)
+            ax.annotate(str(site),xy=pos,fontsize=8*figsizeboost)
             
         if not filename is None:
             plt.savefig(filename,**savefigkwargs)
@@ -128,7 +133,7 @@ class kitaevhoneycomb(object):
         else:
             plt.close()
 
-    def draw_system(self,draw_sites=True,display_fig=True,defer_display=False,filename=None,**savefigkwargs):
+    def draw_system(self,draw_sites=True,display_fig=True,defer_display=False,filename=None,figsizeboost=1.,**savefigkwargs):
         """
         draw the complete system with all sites, vortices and all A-links indicated.
         (this will be slow for large systems.)
@@ -141,7 +146,7 @@ class kitaevhoneycomb(object):
         whether the A matrix is being computed correctly or not. however, a quicker version
         could be written that only visits the A-links we expect to have non-zero values.
         """
-        fscale = self.vortices.shape[0]/10.
+        fscale = figsizeboost*self.vortices.shape[0]/10.
         fig,ax = plt.subplots(figsize=(fscale*12,fscale*9))
         ax.set_aspect('equal')
         plt.axis('off')
@@ -151,72 +156,78 @@ class kitaevhoneycomb(object):
             for bw in [0,1]:
                 sites = (self.one_d_index_to_resolved[:,2]==bw)
                 ax.scatter(self.real_space_positions[sites,0],self.real_space_positions[sites,1],c='C'+str(bw),s=50)
-            
+         
+        #   
         # add couplings
+        #
+
+        # identify the elements of A that need to be drawn
+        links_to_draw = np.argwhere(np.logical_and(self.A>0,np.logical_not(np.isclose(self.A,0.))))
+
         a1 = np.array([np.sqrt(3),0.])
         a2 = np.array([np.sqrt(3)/2,-3./2])
         bw_vector = np.array([np.sqrt(3)/2,-1./2])
-        regular_A = make_A(self.J,self.K,np.ones(self.vortices.shape),np.ones(self.vortices.shape),np.ones(self.vortices.shape),self.resolved_index_to_one_d)
-        for site in range(2*self.vortices.size):
-            for siteprime in range(site):
-                if not np.isclose(np.abs(self.A[site,siteprime]),0.):
-                    pos = self.real_space_positions[site]
-                    posprime = self.real_space_positions[siteprime]
 
-                    # if the links are flipped relative to no-vortex sector colour them red
-                    colour = 'k'
-                    if not np.isclose(self.A[site,siteprime],regular_A[site,siteprime]):
-                        colour = 'r'
+        # canonical version of the no-vortex sector to base colouring against
+        regular_A = make_A(self.J,self.K,np.ones(self.vortices.shape),np.ones(self.vortices.shape),np.ones(self.vortices.shape),self.resolved_index_to_one_d)
+
+        for site_a,site_b in links_to_draw:
+            pos_a = self.real_space_positions[site_a]
+            pos_b = self.real_space_positions[site_b]
+
+            # if the links are flipped relative to no-vortex sector colour them red
+            colour = 'k'
+            if not np.isclose(self.A[site_a,site_b],regular_A[site_a,site_b]):
+                colour = 'r'
+                
+            # handle boundary links
+            # ---
+            # also draws invisible point at edge to ensure arrows hanging off the sides
+            # are not culled
+            invisible_point_size = 20
+            if np.abs(self.one_d_index_to_resolved[site_a][0]-self.one_d_index_to_resolved[site_b][0])==(self.vortices.shape[0]-1) and\
+               np.abs(self.one_d_index_to_resolved[site_a][1]-self.one_d_index_to_resolved[site_b][1])==(self.vortices.shape[1]-1):
+                # corner wrap around draw correction
+                #colour = 'b'
+                if self.one_d_index_to_resolved[site_a][1]>self.one_d_index_to_resolved[site_b][1]:
+                    pos_a = pos_a+self.vortices.shape[0]*a2
+                    pos_a = pos_a-self.vortices.shape[1]*a1
+                    ax.scatter(pos_a[0],pos_a[1],c='w',s=invisible_point_size)
+                else:
+                    pos_b = pos_b+self.vortices.shape[0]*a2
+                    pos_b = pos_b-self.vortices.shape[1]*a1
+                    ax.scatter(pos_b[0],pos_b[1],c='w',s=invisible_point_size)
+                    
+            else:
+                # left-right (col) wrap around draw correction
+                if np.abs(self.one_d_index_to_resolved[site_a][1]-self.one_d_index_to_resolved[site_b][1])==(self.vortices.shape[1]-1):
+                    #colour = 'r'
+                    if self.one_d_index_to_resolved[site_a][1]>self.one_d_index_to_resolved[site_b][1]:
+                        pos_b = pos_b+self.vortices.shape[1]*a1
+                        ax.scatter(pos_b[0],pos_b[1],c='w',s=invisible_point_size)
+                    else:
+                        pos_a = pos_a+self.vortices.shape[1]*a1
+                        ax.scatter(pos_a[0],pos_a[1],c='w',s=invisible_point_size)
+                # up-down (row) wrap around draw correction
+                if np.abs(self.one_d_index_to_resolved[site_a][0]-self.one_d_index_to_resolved[site_b][0])==(self.vortices.shape[0]-1):
+                    #colour = 'g'
+                    if self.one_d_index_to_resolved[site_a][0]>self.one_d_index_to_resolved[site_b][0]:
+                        pos_b = pos_b+self.vortices.shape[0]*a2
+                        ax.scatter(pos_b[0],pos_b[1],c='w',s=invisible_point_size)
+                    else:
+                        pos_a = pos_a+self.vortices.shape[0]*a2
+                        ax.scatter(pos_a[0],pos_a[1],c='w',s=invisible_point_size)
                         
-                    # handle boundary links
-                    # ---
-                    # also draws invisible point at edge to ensure arrows hanging off the sides
-                    # are not culled
-                    invisible_point_size = 20
-                    if np.abs(self.one_d_index_to_resolved[site][0]-self.one_d_index_to_resolved[siteprime][0])==(self.vortices.shape[0]-1) and\
-                       np.abs(self.one_d_index_to_resolved[site][1]-self.one_d_index_to_resolved[siteprime][1])==(self.vortices.shape[1]-1):
-                        # corner wrap around draw correction
-                        #colour = 'b'
-                        if self.one_d_index_to_resolved[site][1]>self.one_d_index_to_resolved[siteprime][1]:
-                            pos = pos+self.vortices.shape[0]*a2
-                            pos = pos-self.vortices.shape[1]*a1
-                            ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
-                        else:
-                            posprime = posprime+self.vortices.shape[0]*a2
-                            posprime = posprime-self.vortices.shape[1]*a1
-                            ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
-                            
-                    else:
-                        # left-right (col) wrap around draw correction
-                        if np.abs(self.one_d_index_to_resolved[site][1]-self.one_d_index_to_resolved[siteprime][1])==(self.vortices.shape[1]-1):
-                            #colour = 'r'
-                            if self.one_d_index_to_resolved[site][1]>self.one_d_index_to_resolved[siteprime][1]:
-                                posprime = posprime+self.vortices.shape[1]*a1
-                                ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
-                            else:
-                                pos = pos+self.vortices.shape[1]*a1
-                                ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
-                        # up-down (row) wrap around draw correction
-                        if np.abs(self.one_d_index_to_resolved[site][0]-self.one_d_index_to_resolved[siteprime][0])==(self.vortices.shape[0]-1):
-                            #colour = 'g'
-                            if self.one_d_index_to_resolved[site][0]>self.one_d_index_to_resolved[siteprime][0]:
-                                posprime = posprime+self.vortices.shape[0]*a2
-                                ax.scatter(posprime[0],posprime[1],c='w',s=invisible_point_size)
-                            else:
-                                pos = pos+self.vortices.shape[0]*a2
-                                ax.scatter(pos[0],pos[1],c='w',s=invisible_point_size)
-                                
-                    # draw A-links as arrows
-                    if self.A[site,siteprime]>0:
-                        ax.annotate("",xytext=tuple(pos),xy=tuple(posprime),\
-                                    arrowprops={'arrowstyle':'->',\
-                                                'alpha':np.abs(self.A[site,siteprime])/np.max(self.A),\
-                                                'color':colour})
-                    else:
-                        ax.annotate("",xytext=tuple(posprime),xy=tuple(pos),\
-                                    arrowprops={'arrowstyle':'->',\
-                                                'alpha':np.abs(self.A[site,siteprime])/np.max(self.A),\
-                                                'color':colour})
+            # draw A-links as arrows
+            alpha = np.abs(self.A[site_a,site_b])/np.max(self.A)
+            midpoint = pos_a+0.6*(pos_b-pos_a)
+            ax.annotate("",xytext=tuple(pos_a),xy=tuple(midpoint),\
+                        arrowprops={'arrowstyle':'->, head_width=0.5, head_length=1',\
+                                    'linewidth':0.9,\
+                                    'alpha':alpha,\
+                                    'color':colour})
+            midpoint = pos_a+0.5*(pos_b-pos_a)
+            plt.plot([midpoint[0],pos_b[0]],[midpoint[1],pos_b[1]],color=colour,alpha=alpha,linewidth=0.9)
                         
         # draw vortices
         ax.scatter(self.real_space_positions[self.resolved_index_to_one_d[self.vortices==-1,1]][:,0]+bw_vector[0],\
