@@ -222,7 +222,7 @@ class kitaevhoneycomb(object):
             alpha = np.abs(self.A[site_a,site_b])/np.max(self.A)
             midpoint = pos_a+0.6*(pos_b-pos_a)
             ax.annotate("",xytext=tuple(pos_a),xy=tuple(midpoint),\
-                        arrowprops={'arrowstyle':'->, head_width=0.5, head_length=1',\
+                        arrowprops={'arrowstyle':'->, head_width='+"{0:.3g}".format(0.25*figsizeboost)+', head_length='+"{0:.3g}".format(0.5*figsizeboost),\
                                     'linewidth':0.9,\
                                     'alpha':alpha,\
                                     'color':colour})

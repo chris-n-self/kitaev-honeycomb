@@ -41,7 +41,8 @@ Lrows,Lcols = 10,10
 J = [1,1,1]
 K = 0.1
 
-# no-vortex sector
+# no-vortex sector, typically u arrays will only have entries +1, -1 and 0, 
+# so can be constructed with data type np.int8
 ux = np.ones((Lrows,Lcols),dtype=np.int8)
 uy = np.ones((Lrows,Lcols),dtype=np.int8)
 uz = np.ones((Lrows,Lcols),dtype=np.int8)
@@ -59,7 +60,7 @@ The link variables `u` encode the vortex (and topological) sector, but they can 
 uz[-1,:] = 0
 ```
 
-Typically the `u` arrays will only have values +1, -1 and 0, hence why they are constructed with the data type `np.int8` in the example. However, the class should still work without them being integers. 
+The construction of the lattice and how exactly the `u` arrays relate to the links of the honeycomb lattice is broken down in the `lattice-construction` notebook in the examples folder.
 
 ### `parityprojectedfermions`
 
